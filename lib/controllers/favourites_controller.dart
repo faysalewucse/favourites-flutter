@@ -17,4 +17,8 @@ class FavouriteController extends GetxController{
       }
     });
   }
+
+  bool isFavorite(User item) {
+    return favourites.value.favourites_items.contains(item);
+  }
 }

@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:fav_task2/cards/fav_item_card.dart';
 import 'package:fav_task2/controllers/favourites_controller.dart';
+import 'package:fav_task2/models/user.dart';
 import 'package:fav_task2/pages/favourite_items.dart';
+import 'package:fav_task2/styles/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,154 +18,161 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   FavouriteController favouriteController = Get.put(FavouriteController());
+  bool loading = true;
 
-  List<dynamic> checkboxes = [
-    {
-      "id": 1,
-      "title": "Box 1",
-    },
-    {
-      "id": 2,
-      "title": "Box 2",
-    },
-    {
-      "id": 3,
-      "title": "Box 3",
+  late List<User> fetchedData = [];
+  late List<User> userData = [];
+  late List<User> userDataCopy = [];
+
+  void filterList(String query) {
+    if (query == "") {
+      setState(() {
+        userData = userDataCopy;
+      });
+    } else {
+      setState(() {
+        userData = userData
+            .where((item) => item.owner.name
+                .toString()
+                .toLowerCase()
+                .contains(query.toLowerCase()))
+            .toList();
+      });
     }
-  ];
-  List checked = [];
+  }
+
+  Future<void> fetchData() async {
+    final response = await http.get(
+        Uri.parse('https://list.ly/api/v4/lists/trending?page=1&per_page=10'));
+
+    if (response.statusCode == 200) {
+      setState(() {
+        userData = (jsonDecode(response.body)['lists'] as List)
+            .map((e) => User.fromJson(e))
+            .toList();
+        loading = false;
+      });
+      debugPrint("=====.. api data: ${userData.map((e) => e.toJson())}");
+    } else {
+      throw Exception('Failed to load data');
+    }
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    fetchData();
+    userData = favouriteController.favourites.value.favourites_items;
+    userDataCopy = favouriteController.favourites.value.favourites_items;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(""),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Hey, Welcome Back",
-                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    showModalBottomSheet(
-                        isDismissible: true,
-                        isScrollControlled: true,
-                        context: context,
-                        builder: (context) {
-                          return StatefulBuilder(// this is new
-                              builder:
-                                  (BuildContext context, StateSetter setSt) {
-                            return SizedBox(
-                                height: 350,
-                                width: double.infinity,
-                                child: Column(
-                                  children: <Widget>[
-                                    Container(
-                                      padding: const EdgeInsets.only(
-                                          left: 10.0,
-                                          right: 10.0,
-                                          top: 20.0,
-                                          bottom: 15.0),
-                                      child: const Text(
-                                        'CheckBox List',
-                                        style: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: 24,
-                                            fontFamily: 'Jost',
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    Container(
-                                        height: 80,
-                                        padding: const EdgeInsets.only(
-                                            left: 25.0, right: 25.0),
-                                        child: ListView.builder(
-
-                                            itemCount: checkboxes.length,
-                                            itemBuilder: (context, index) {
-                                              return Padding(
-                                                padding: const EdgeInsets.all(8.0),
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Text(checkboxes[index]
-                                                        ["title"]),
-                                                    GestureDetector(
-                                                      onTap:(){
-                                                        setSt((){
-                                                          if(checked.contains(checkboxes[index]['id'])
-                                                          ){
-                                                            checked.remove(checkboxes[index]['id']);
-                                                          }
-                                                          else{
-                                                            checked.add(checkboxes[index]['id']);
-                                                          }
-                                                        });
-                                                      },
-                                                      child: checked.contains(checkboxes[index]['id']) ? const Icon(Icons.circle_outlined) : const Icon(Icons.check_circle_rounded) )
-
-                                                  ],
-                                                ),
-                                              );
-                                            })),
-                                  ],
-                                ));
-                          });
-                        });
-                  },
-                  child: const Icon(
-                    Icons.waving_hand,
-                    color: Colors.orange,
-                    size: 30,
-                  ),
-                )
-              ],
-            ),
-            Expanded(
-                child: Obx(() => favouriteController
-                        .favourites.value.favourites_items.isEmpty
-                    ? const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "No Items to show now",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                                fontSize: 25),
-                          ),
-                          Text("Please add some favourite items to see here",
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey)),
-                        ],
-                      )
-                    : ListView.builder(
-                        itemCount: favouriteController
-                            .favourites.value.favourites_items.length,
-                        itemBuilder: (context, index) {
-                          final item = favouriteController
-                              .favourites.value.favourites_items[index];
-                          return favCard(item, favouriteController);
-                        },
-                      )))
-          ],
+        title: const Text(
+          "Restaurant",
+          style: textBoldMd,
         ),
       ),
+      body: loading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Colors.black87,
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Hey, Welcome Back",
+                        style: TextStyle(
+                            fontSize: 25, fontWeight: FontWeight.bold),
+                      ),
+                      Icon(
+                        Icons.waving_hand,
+                        color: Colors.orange,
+                        size: 30,
+                      )
+                    ],
+                  ),
+                  const SizedBox(
+                    height: 10,
+                  ),
+                  Expanded(
+                      child: Obx(() => favouriteController
+                              .favourites.value.favourites_items.isNotEmpty
+                          ? Column(
+                              children: [
+                                TextField(
+                                  onChanged: filterList,
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16.0, vertical: 12.0),
+                                    // Adjust padding as needed
+                                    enabledBorder: OutlineInputBorder(
+                                      borderSide:
+                                          const BorderSide(color: Colors.grey),
+                                      borderRadius: BorderRadius.circular(
+                                          8.0), // Adjust border radius as needed
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderSide:
+                                          const BorderSide(color: Colors.grey),
+                                      // Border color when the field is focused
+                                      borderRadius: BorderRadius.circular(8.0),
+                                    ),
+                                    suffixIcon: const Icon(Icons.search,
+                                        color: Colors.grey),
+                                    // Adjust icon color
+                                    hintText: 'Search for items',
+                                    // Placeholder text
+                                    hintStyle: const TextStyle(
+                                        color: Colors
+                                            .grey), // Placeholder text style
+                                  ),
+                                ),
+                                Expanded(
+                                  child: ListView.builder(
+                                    itemCount: userData.length,
+                                    itemBuilder: (context, index) {
+                                      final item = userData[index];
+                                      return favCard(item);
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          : const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "No Items to show now",
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
+                                      fontSize: 25),
+                                ),
+                                Text(
+                                    "Please add some favourite items to see here",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey)),
+                              ],
+                            ))),
+                ],
+              ),
+            ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(10.0),
         child: TextButton(
             onPressed: () {
-              Get.to(const FavouriteItems());
+              Get.to(const FavouriteItems(), arguments: userData);
             },
             style: TextButton.styleFrom(
                 shape: RoundedRectangleBorder(
